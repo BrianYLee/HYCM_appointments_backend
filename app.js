@@ -72,7 +72,7 @@ app.post('/api/wechat-login', async (req, res) => {
         // Return the session_key and openid to the client
         res.json({
           success: true,
-          session_key,
+          //session_key,
           openid,
         });
       }
