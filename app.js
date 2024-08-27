@@ -14,7 +14,7 @@ const appointmentsRoute = require('./routes/appointments');
 const wechat_sessionsRoute = require('./routes/wechat_sessions');
 
 app.use('/api/appointments', appointmentsRoute);
-app.use('/api/appointments', wechat_sessionsRoute);
+app.use('/api/wechatlogin', wechat_sessionsRoute);
 
 // Start the server
 app.listen(port, () => {
