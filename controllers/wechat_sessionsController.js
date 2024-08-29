@@ -25,12 +25,40 @@ exports.postWechatLogin = async (req, res) => {
             `INSERT INTO wechat_sessions (openid, session_key) VALUES (?, ?)
             ON DUPLICATE KEY UPDATE session_key = ?, updated_at = CURRENT_TIMESTAMP`,
             [openid, session_key, session_key],
-            (err, result) => {
-                if (err) {
-                    console.error('Error storing session data: ', err)
+            (err1, result1) => {
+                if (err1) {
+                    console.error('Error storing session data: ', err1)
                     return res.status(500).json({ success: false, message: 'db error' });
                 }
-                res.json({ success: true, openid });
+                pool.query(
+                    `SELECT * FROM employees WHERE wechat_open_id = ?`,
+                    [openid],
+                    (err2, result2) => {
+                        if (err2) {
+                            console.error(`Error querying employee for openid: ${openid}`, err)
+                            return res.status(500).json({ success: false, message: 'db error' });
+                        }
+                        else if (result2.length > 1) {
+                            console.error(`multiple employees found for openid: ${openid}`, err);
+                            return res.json({ success: true, openid });
+                        }
+                        else if (result2.length == 0) {
+                            console.log(`openid: ${openid} is not an employee`);
+                            return res.json({ success: true, openid });
+                        }
+                        else { // is an employee
+                            if (result2[0].active) {
+                                console.log(`openid: ${openid} is an ACTIVE employee`);
+                                return res.json({ success: true, openid, employee: true });
+                            }
+                            else {
+                                console.log(`openid: ${openid} is an INACTIVE employee`);
+                                return res.json({ success: true, openid });
+                            }
+                        }
+                    }
+                )
+                //res.json({ success: true, openid });
             }
         )
     } catch (err) {
