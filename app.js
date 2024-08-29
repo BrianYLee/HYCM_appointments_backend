@@ -13,8 +13,8 @@ app.use(bodyParser.json());
 const appointmentsRoute = require('./routes/appointments');
 const wechat_sessionsRoute = require('./routes/wechat_sessions');
 
-app.use('/api/appointments', appointmentsRoute);
-app.use('/api/wechatlogin', wechat_sessionsRoute);
+app.use('/appointments', appointmentsRoute);
+app.use('/wechatlogin', wechat_sessionsRoute);
 
 // Start the server
 app.listen(port, () => {
