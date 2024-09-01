@@ -1,25 +1,75 @@
 const pool = require('../config/db');
 const moment = require('moment-timezone');
 
+const filterAppointmentsByDept = (apmts, dept) => {
+    if (!dept) {
+        return [];
+    }
+    switch (dept) {
+        case '安保':
+            return apmts.map((apmt) => {
+                const { type, hotel, golf, horse, manager_name, created_date, created_by, ...rest } = apmt;
+                return rest;
+            });
+        case '市场':
+            return apmts.map((apmt) => {
+                const { hotel, golf, created_date, created_by, ...rest } = apmt;
+                return rest;
+            });
+        case '酒店':
+            return apmts.map((apmt) => {
+                const { golf, horse, created_date, created_by, ...rest } = apmt;
+                return rest;
+            });
+        case '球会':
+            return apmts.map((apmt) => {
+                const { hotel, horse, created_date, created_by, ...rest } = apmt;
+                return rest;
+            });
+        case '马会':
+            return apmts.map((apmt) => {
+                const { hotel, golf, created_date, created_by, ...rest } = apmt;
+                return rest;
+            });
+        case '其他':
+            return apmts.map((apmt) => {
+                const { hotel, golf, horse, created_date, created_by, ...rest } = apmt;
+                return rest;
+            });
+        case 'admin':
+            return apmts;
+    }
+}
+
 // Function to fetch appointment records
 exports.getAppointments = (req, res) => {
-    const dateToFetch = req.query?.date || moment().format('YYYY-MM-DD');
-    console.log('dateToFetch: ' + dateToFetch);
-    pool.query(`SELECT * FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}'`, (error, results) => {
-        if (error) {
-            return res.status(500).json({ error: 'Database query failed' });
-        }
-        // not sure why but inserted records have varying timezones for scheduled_date
-        // fix results so that query are in beijing timezone
-        results.forEach(appointment => {
-            //const dateUTC = moment().utc(appointment.scheduled_date);
-            //console.log('dateUTC: ' +dateUTC);
-            //const formattedDate = dateUTC.tz('Asia/Shanghai').format('YYYY-MM-DD');
-            appointment.scheduled_date = dateToFetch;
+    try {
+        const openid = req.query?.openid;
+        const dateToFetch = req.query?.date;
+        pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[openid], (err1, result1) => {
+            if (err1) {
+                return res.status(500).json({ error: 'Database query failed' });
+            }
+            if (result1.length == 0 || !result1[0].active) {
+                return res.status(500).json({ error: 'unauthorized' });
+            }
+            const employeeDept = result1[0].department;
+            pool.query(`SELECT * FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}'`, (error2, results) => {
+                if (error2) {
+                    return res.status(500).json({ error: 'Database query failed' });
+                }
+                // not sure why but inserted records have varying timezones for scheduled_date
+                // fix results so that query are in beijing timezone
+                results.forEach(appointment => {
+                    appointment.scheduled_date = dateToFetch;
+                });
+                res.json(filterAppointmentsByDept(results, employeeDept));
+            });
         });
-        console.log(results);
-        res.json(results);
-    });
+    } catch (err) {
+        console.error('something bad happened', err);
+        return res.status(500).json({ error: 'server error' });
+    }
 };
 
 exports.postAppointment = (req, res) => {
@@ -27,16 +77,22 @@ exports.postAppointment = (req, res) => {
     if (!body || !body.openid || !body.scheduled_date || !body.type || !body.hotel || !body.golf || !body.horse || !body.studio_name || !body.manager_name || !body.plate) {
         return res.status(400).json({ error: 'bad request payload'});
     }
-    const query = `INSERT INTO appointments (scheduled_date, type, hotel, golf, horse, studio_name, manager_name, plate, created_by) SELECT ?, ?, ?, ?, ?, ?, ?, ?, e.id FROM employees e WHERE e.wechat_open_id = ?;`;
-    
-    // results
-    pool.query(query, [body.scheduled_date, body.type, body.hotel, body.golf, body.horse, body.studio_name, body.manager_name, body.plate, body.openid], (error, result) => {
-        if (error) {
-            console.log('db error while posting appointment');
-            console.log(body);
-            return res.status(500).json({ error: 'db error posting appointment' });
+    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[openid], (err1, result1) => {
+        if (err1) {
+            return res.status(500).json({ error: 'Database query failed' });
         }
-        res.status(200).json({ message: 'appointment checked in'});
+        if (result1.length == 0 || !result1[0]?.department == 'admin') {
+            return res.status(500).json({ error: 'unauthorized' });
+        }
+        const query = `INSERT INTO appointments (scheduled_date, type, hotel, golf, horse, studio_name, manager_name, plate, created_by) SELECT ?, ?, ?, ?, ?, ?, ?, ?, e.id FROM employees e WHERE e.wechat_open_id = ?;`;
+        pool.query(query, [body.scheduled_date, body.type, body.hotel, body.golf, body.horse, body.studio_name, body.manager_name, body.plate, body.openid], (error2, result) => {
+            if (error2) {
+                console.log('db error while posting appointment');
+                console.log(body);
+                return res.status(500).json({ error: 'db error inserting appointment' });
+            }
+            res.status(200).json({ message: 'appointment added'});
+        });
     });
 };
 
@@ -61,13 +117,17 @@ exports.postCheckIn = (req, res) => {
         }
         if (results1.length == 0) {
             console.log('no employee found with openid ' + body.openId);
-            return res.status(500).json({ error: 'no employee foun with given openid' });
+            return res.status(500).json({ error: 'no employee found with given openid' });
         }
         if (results1.length > 1) {
             console.log('something is srsly fucked. why are there multiple employees for openid ' + body.openId);
             console.log(results1);
             return res.status(500).json({ error: 'something is srsly fucked. why are there multiple employees for the given openid '});
-
+        }
+        if (!results1[0].active) {
+            console.log(`${body.openId} is not authorized`);
+            console.log(results1);
+            return res.status(500).json({ error: 'unauthorized'});
         }
         const employeeId = results1[0].id;
         pool.query(apmtQuery, [true, body.apmtId], (err2, results2) => {
@@ -114,6 +174,11 @@ exports.postCheckOut = (req, res) => {
             console.log(results1);
             return res.status(500).json({ error: 'something is srsly fucked. why are there multiple employees for the given openid '});
 
+        }
+        if (!results1[0].active) {
+            console.log(`${body.openId} is not authorized`);
+            console.log(results1);
+            return res.status(500).json({ error: 'unauthorized'});
         }
         const employeeId = results1[0].id;
         pool.query(apmtQuery, [false, body.apmtId], (err2, results2) => {
