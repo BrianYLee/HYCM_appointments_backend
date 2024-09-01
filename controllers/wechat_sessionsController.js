@@ -1,3 +1,4 @@
+
 const pool = require('../config/db');
 const axios = require('axios');
 
@@ -28,18 +29,17 @@ exports.postWechatLogin = async (req, res) => {
             (err1, result1) => {
                 if (err1) {
                     console.error('Error storing session data: ', err1)
-                    return res.status(500).json({ success: false, message: 'db error' });
                 }
                 pool.query(
                     `SELECT * FROM employees WHERE wechat_open_id = ?`,
                     [openid],
                     (err2, result2) => {
                         if (err2) {
-                            console.error(`Error querying employee for openid: ${openid}`, err)
+                            console.error(`Error querying employee for openid: ${openid}`, err2)
                             return res.status(500).json({ success: false, message: 'db error' });
                         }
                         else if (result2.length > 1) {
-                            console.error(`multiple employees found for openid: ${openid}`, err);
+                            console.error(`multiple employees found for openid: ${openid}`, err2);
                             return res.json({ success: true, openid });
                         }
                         else if (result2.length == 0) {
@@ -49,7 +49,7 @@ exports.postWechatLogin = async (req, res) => {
                         else { // is an employee
                             if (result2[0].active) {
                                 console.log(`openid: ${openid} is an ACTIVE employee`);
-                                return res.json({ success: true, openid, employee: true });
+                                return res.json({ success: true, openid, employee: true, employee_name: `${result2[0].last_name}${result2[0].first_name}`, department: result2[0].department });
                             }
                             else {
                                 console.log(`openid: ${openid} is an INACTIVE employee`);
@@ -57,12 +57,71 @@ exports.postWechatLogin = async (req, res) => {
                             }
                         }
                     }
-                )
-                //res.json({ success: true, openid });
+                );
+            }
+        );
+    } catch (err) {
+        console.error('Error during WeChat login: ', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+
+exports.postWechatRenew = async (req, res) => {
+    const { openid } = req.body;
+    if (!openid) {
+        res.status(400).json({ success: false, message: 'id required' });
+    }
+    try {
+        pool.query(
+            `SELECT * FROM wechat_sessions WHERE openid = ?`,
+            [openid],
+            (err1, result1) => {
+                if (err1) {
+                    console.error('Error storing session data: ', err1)
+                }
+                else if (result1.length == 0) {
+                    console.error('no wechat session found for ' + openid)
+                    return res.status(500).json({ success: false, message: 'no_session_found' });
+                }
+                else if (result1.length > 1) {
+                    console.error('FATAL: multiple records for ' + openid)
+                    return res.status(500).json({ success: false, message: 'fatal' });
+                }
+                else {
+                    pool.query(
+                        `SELECT * FROM employees WHERE wechat_open_id = ?`,
+                        [openid],
+                        (err2, result2) => {
+                            if (err2) {
+                                console.error(`Error querying employee for openid: ${openid}`, err2)
+                                return res.status(500).json({ success: false, message: 'db error' });
+                            }
+                            else if (result2.length > 1) {
+                                console.error(`multiple employees found for openid: ${openid}`);
+                                return res.json({ success: true, openid });
+                            }
+                            else if (result2.length == 0) {
+                                console.log(`openid: ${openid} is not an employee`);
+                                return res.json({ success: true, openid });
+                            }
+                            else { // is an employee
+                                if (result2[0].active) {
+                                    console.log(`openid: ${openid} is an ACTIVE employee`);
+                                    return res.json({ success: true, openid, employee: true, employee_name: `${result2[0].last_name}${result2[0].first_name}`, department: result2[0].department });
+                                }
+                                else {
+                                    console.log(`openid: ${openid} is an INACTIVE employee`);
+                                    return res.json({ success: true, openid });
+                                }
+                            }
+                        }
+                    )
+                }
             }
         )
     } catch (err) {
-        console.error('Error during WeChat login: ', err);
+        console.error('Error during WeChat renew: ', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };

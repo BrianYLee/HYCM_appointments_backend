@@ -5,6 +5,9 @@ const appointmentsController = require('../controllers/appointmentsController');
 // Define the route to fetch appointment records
 router.get('/', appointmentsController.getAppointments);
 
+// new appoint record
+router.post('/', appointmentsController.postAppointment);
+
 // checkin
 router.post('/checkin', appointmentsController.postCheckIn);
 

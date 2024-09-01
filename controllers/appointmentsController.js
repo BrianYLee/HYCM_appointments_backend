@@ -22,6 +22,24 @@ exports.getAppointments = (req, res) => {
     });
 };
 
+exports.postAppointment = (req, res) => {
+    const body = req.body;
+    if (!body || !body.openid || !body.scheduled_date || !body.type || !body.hotel || !body.golf || !body.horse || !body.studio_name || !body.manager_name || !body.plate) {
+        return res.status(400).json({ error: 'bad request payload'});
+    }
+    const query = `INSERT INTO appointments (scheduled_date, type, hotel, golf, horse, studio_name, manager_name, plate, created_by) SELECT ?, ?, ?, ?, ?, ?, ?, ?, e.id FROM employees e WHERE e.wechat_open_id = ?;`;
+    
+    // results
+    pool.query(query, [body.scheduled_date, body.type, body.hotel, body.golf, body.horse, body.studio_name, body.manager_name, body.plate, body.openid], (error, result) => {
+        if (error) {
+            console.log('db error while posting appointment');
+            console.log(body);
+            return res.status(500).json({ error: 'db error posting appointment' });
+        }
+        res.status(200).json({ message: 'appointment checked in'});
+    });
+};
+
 exports.postCheckIn = (req, res) => {
     const body = req.body;
     console.log('got checkin post request');

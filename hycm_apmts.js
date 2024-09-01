@@ -11,10 +11,12 @@ app.use(bodyParser.json());
 
 // Routers
 const appointmentsRoute = require('./routes/appointments');
-const wechat_sessionsRoute = require('./routes/wechat_sessions');
+const registerRoute = require('./routes/register');
+const loginRoute = require('./routes/login');
 
 app.use('/appointments', appointmentsRoute);
-app.use('/wechatlogin', wechat_sessionsRoute);
+app.use('/login', loginRoute);
+app.use('/register', registerRoute);
 
 // Start the server
 app.listen(port, () => {
