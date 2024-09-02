@@ -8,36 +8,44 @@ const filterAppointmentsByDept = (apmts, dept) => {
     switch (dept) {
         case '安保':
             return apmts.map((apmt) => {
+                apmt = { ...apmt, canCheckIn: true, canCheckOut: false };
                 const { type, hotel, golf, horse, manager_name, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '市场':
             return apmts.map((apmt) => {
+                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
                 const { hotel, golf, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '酒店':
             return apmts.map((apmt) => {
+                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
                 const { golf, horse, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '球会':
             return apmts.map((apmt) => {
+                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
                 const { hotel, horse, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '马会':
-            return apmts.map((apmt) => {
+            return apmts.filter(apmt => apmt.horse == true).map((apmt) => {
+                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
                 const { hotel, golf, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '其他':
             return apmts.map((apmt) => {
+                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
                 const { hotel, golf, horse, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case 'admin':
-            return apmts;
+            return apmts.map((apmt) => {
+                return { ...apmt, canCheckIn: true, canCheckOut: true };
+            });
     }
 }
 
@@ -77,7 +85,7 @@ exports.postAppointment = (req, res) => {
     if (!body || !body.openid || !body.scheduled_date || !body.type || !body.hotel || !body.golf || !body.horse || !body.studio_name || !body.manager_name || !body.plate) {
         return res.status(400).json({ error: 'bad request payload'});
     }
-    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[openid], (err1, result1) => {
+    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[body.openid], (err1, result1) => {
         if (err1) {
             return res.status(500).json({ error: 'Database query failed' });
         }
@@ -105,7 +113,7 @@ exports.postCheckIn = (req, res) => {
     }
     
     // queries
-    const employeeIdQuery = 'SELECT id FROM employees WHERE wechat_open_id = ?';
+    const employeeIdQuery = 'SELECT * FROM employees WHERE wechat_open_id = ?';
     const apmtQuery = 'UPDATE appointments SET checked_in = ? WHERE id = ?';
     const checkInQuery = 'INSERT INTO check_ins (appointment_id, employee_id) VALUES (?, ?)';
     
@@ -155,7 +163,7 @@ exports.postCheckOut = (req, res) => {
     }
     
     // queries
-    const employeeIdQuery = 'SELECT id FROM employees WHERE wechat_open_id = ?';
+    const employeeIdQuery = 'SELECT * FROM employees WHERE wechat_open_id = ?';
     const apmtQuery = 'UPDATE appointments SET checked_in = ? WHERE id = ?';
     const checkOutQuery = 'INSERT INTO check_outs (appointment_id, employee_id) VALUES (?, ?)';
     
