@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const moment = require('moment-timezone');
+//const moment = require('moment-timezone');
 
 const filterAppointmentsByDept = (apmts, dept) => {
     if (!dept) {
@@ -44,7 +44,7 @@ const filterAppointmentsByDept = (apmts, dept) => {
             });
         case 'admin':
             return apmts.map((apmt) => {
-                return { ...apmt, canCheckIn: true, canCheckOut: true };
+                return { ...apmt, canCheckIn: true, canCheckOut: true, canEdit: true };
             });
     }
 }
