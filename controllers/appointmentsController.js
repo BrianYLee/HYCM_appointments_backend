@@ -9,7 +9,7 @@ const filterAppointmentsByDept = (apmts, dept) => {
         case '安保':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: true, canCheckOut: false };
-                const { type, hotel, golf, horse, manager_name, created_date, created_by, ...rest } = apmt;
+                const { type, hotel, golf, horse, areas, scheduled_time_string, manager_name, bridal_name, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '市场':
@@ -21,25 +21,25 @@ const filterAppointmentsByDept = (apmts, dept) => {
         case '酒店':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { golf, horse, created_date, created_by, ...rest } = apmt;
+                const { golf, horse, created_date, areas, created_by, ...rest } = apmt;
                 return rest;
             });
         case '球会':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, horse, created_date, created_by, ...rest } = apmt;
+                const { hotel, horse, created_date, areas, scheduled_time_string, created_by, ...rest } = apmt;
                 return rest;
             });
         case '马会':
             return apmts.filter(apmt => apmt.horse == true).map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, golf, created_date, created_by, ...rest } = apmt;
+                const { hotel, golf, areas, scheduled_time_string, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '其他':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, golf, horse, created_date, created_by, ...rest } = apmt;
+                const { hotel, golf, horse, areas, scheduled_time_string, bridal_name, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case 'admin':
@@ -92,11 +92,12 @@ exports.postAppointment = (req, res) => {
         if (result1.length == 0 || !result1[0]?.department == 'admin') {
             return res.status(500).json({ error: 'unauthorized' });
         }
-        const query = `INSERT INTO appointments (scheduled_date, type, hotel, golf, horse, studio_name, manager_name, plate, created_by) SELECT ?, ?, ?, ?, ?, ?, ?, ?, e.id FROM employees e WHERE e.wechat_open_id = ?;`;
-        pool.query(query, [body.scheduled_date, body.type, body.hotel, body.golf, body.horse, body.studio_name, body.manager_name, body.plate, body.openid], (error2, result) => {
+        const query = `INSERT INTO appointments (scheduled_date, scheduled_time_string, areas, type, hotel, golf, horse, studio_name, manager_name, bridal_name, plate, created_by) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, e.id FROM employees e WHERE e.wechat_open_id = ?;`;
+        pool.query(query, [body.scheduled_date, body.scheduled_time_string, body.areas, body.type, body.hotel, body.golf, body.horse, body.studio_name, body.manager_name, body.bridal_name, body.plate, body.openid], (error2, result) => {
             if (error2) {
                 console.log('db error while posting appointment');
                 console.log(body);
+                console.log(error2);
                 return res.status(500).json({ error: 'db error inserting appointment' });
             }
             res.status(200).json({ message: 'appointment added'});
@@ -139,8 +140,8 @@ exports.editAppointment = (req, res) => {
         if (result1.length == 0 || !result1[0]?.department == 'admin') {
             return res.status(500).json({ error: 'unauthorized' });
         }
-        const query = `UPDATE appointments SET checked_in = ?, scheduled_date = ?, type = ?, horse = ?, studio_name = ?, manager_name = ?, plate = ? WHERE id = ?`;
-        pool.query(query, [body.checked_in, body.scheduled_date, body.type, body.horse, body.studio_name, body.manager_name, body.plate, body.id], (error2, result) => {
+        const query = `UPDATE appointments SET checked_in = ?, scheduled_date = ?, scheduled_time_string = ?, areas = ?, bridal_name = ?, type = ?, horse = ?, studio_name = ?, manager_name = ?, plate = ? WHERE id = ?`;
+        pool.query(query, [body.checked_in, body.scheduled_date, body.scheduled_time_string, body.areas, body.bridal_name, body.type, body.horse, body.studio_name, body.manager_name, body.plate, body.id], (error2, result) => {
             if (error2) {
                 console.log('db error while updating appointment');
                 console.log(body);
