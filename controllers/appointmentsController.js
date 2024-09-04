@@ -62,15 +62,15 @@ exports.getAppointments = (req, res) => {
                 return res.status(500).json({ error: 'unauthorized' });
             }
             const employeeDept = result1[0].department;
-            pool.query(`SELECT * FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}'`, (error2, results) => {
+            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}'`, (error2, results) => {
                 if (error2) {
                     return res.status(500).json({ error: 'Database query failed' });
                 }
                 // not sure why but inserted records have varying timezones for scheduled_date
                 // fix results so that query are in beijing timezone
-                results.forEach(appointment => {
-                    appointment.scheduled_date = dateToFetch;
-                });
+                //results.forEach(appointment => {
+                //    appointment.scheduled_date = dateToFetch;
+                //});
                 res.json(filterAppointmentsByDept(results, employeeDept));
             });
         });
@@ -82,7 +82,7 @@ exports.getAppointments = (req, res) => {
 
 exports.postAppointment = (req, res) => {
     const body = req.body;
-    if (!body || !body.openid || !body.scheduled_date || !body.type || !body.hotel || !body.golf || !body.horse || !body.studio_name || !body.manager_name || !body.plate) {
+    if (!body || !body.openid || !body.scheduled_date || !body.type || body.hotel === undefined || body.golf === undefined || body.horse === undefined || !body.studio_name || !body.manager_name || !body.plate) {
         return res.status(400).json({ error: 'bad request payload'});
     }
     pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[body.openid], (err1, result1) => {
@@ -103,6 +103,55 @@ exports.postAppointment = (req, res) => {
         });
     });
 };
+
+// TODO
+exports.getAppointment = (req, res) => {
+    try {
+        const { openid, apmt } = req.query;
+        pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[openid], (err1, result1) => {
+            if (err1) {
+                return res.status(500).json({ error: 'Database query failed' });
+            }
+            if (result1.length == 0 || !result1[0].department == 'admin') {
+                return res.status(500).json({ error: 'unauthorized' });
+            }
+            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date FROM appointments WHERE id = '${apmt}'`, (error2, results) => {
+                if (error2) {
+                    return res.status(500).json({ error: 'Database query failed' });
+                }
+                res.json(results[0]);
+            });
+        });
+    } catch (err) {
+        console.error('something bad happened', err);
+        return res.status(500).json({ error: 'server error' });
+    }
+}
+
+exports.editAppointment = (req, res) => {
+    const body = req.body;
+    if (!body || !body.openid || !body.id || !body.scheduled_date || !body.type || body.horse === undefined || !body.studio_name || !body.manager_name || !body.plate) {
+        return res.status(400).json({ error: 'bad request payload'});
+    }
+    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[body.openid], (err1, result1) => {
+        if (err1) {
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+        if (result1.length == 0 || !result1[0]?.department == 'admin') {
+            return res.status(500).json({ error: 'unauthorized' });
+        }
+        const query = `UPDATE appointments SET checked_in = ?, scheduled_date = ?, type = ?, horse = ?, studio_name = ?, manager_name = ?, plate = ? WHERE id = ?`;
+        pool.query(query, [body.checked_in, body.scheduled_date, body.type, body.horse, body.studio_name, body.manager_name, body.plate, body.id], (error2, result) => {
+            if (error2) {
+                console.log('db error while updating appointment');
+                console.log(body);
+                console.log(error2);
+                return res.status(500).json({ error: 'db error inserting appointment' });
+            }
+            res.status(200).json({ message: 'appointment updated'});
+        });
+    });
+}
 
 exports.postCheckIn = (req, res) => {
     const body = req.body;
