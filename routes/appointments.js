@@ -17,5 +17,6 @@ router.post('/checkout', appointmentsController.postCheckOut);
 // edit (admin only)
 router.get('/edit', appointmentsController.getAppointment);
 router.post('/edit', appointmentsController.editAppointment);
+router.post('/delete', appointmentsController.deleteAppointment);
 
 module.exports = router;

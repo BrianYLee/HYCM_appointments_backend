@@ -62,7 +62,7 @@ exports.getAppointments = (req, res) => {
                 return res.status(500).json({ error: 'unauthorized' });
             }
             const employeeDept = result1[0].department;
-            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}'`, (error2, results) => {
+            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}' AND deleted = FALSE`, (error2, results) => {
                 if (error2) {
                     return res.status(500).json({ error: 'Database query failed' });
                 }
@@ -104,7 +104,6 @@ exports.postAppointment = (req, res) => {
     });
 };
 
-// TODO
 exports.getAppointment = (req, res) => {
     try {
         const { openid, apmt } = req.query;
@@ -149,6 +148,31 @@ exports.editAppointment = (req, res) => {
                 return res.status(500).json({ error: 'db error inserting appointment' });
             }
             res.status(200).json({ message: 'appointment updated'});
+        });
+    });
+}
+
+exports.deleteAppointment = (req, res) => {
+    const body = req.body;
+    if (!body || !body.openid || !body.id ) {
+        return res.status(400).json({ error: 'bad request payload'});
+    }
+    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[body.openid], (err1, result1) => {
+        if (err1) {
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+        if (result1.length == 0 || !result1[0]?.department == 'admin') {
+            return res.status(500).json({ error: 'unauthorized' });
+        }
+        const query = `UPDATE appointments SET deleted = TRUE WHERE id = ?`;
+        pool.query(query, [body.id], (error2, result) => {
+            if (error2) {
+                console.log('db error while deleting appointment');
+                console.log(body);
+                console.log(error2);
+                return res.status(500).json({ error: 'db error deleting appointment' });
+            }
+            res.status(200).json({ message: 'appointment updated. delete -> TRUE'});
         });
     });
 }
