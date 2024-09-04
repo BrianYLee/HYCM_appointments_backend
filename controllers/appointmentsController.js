@@ -62,7 +62,7 @@ exports.getAppointments = (req, res) => {
                 return res.status(500).json({ error: 'unauthorized' });
             }
             const employeeDept = result1[0].department;
-            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}' AND deleted = FALSE`, (error2, results) => {
+            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date, DATE_FORMAT(created_date, '%Y-%m-%d') AS created_date FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}' AND deleted = FALSE`, (error2, results) => {
                 if (error2) {
                     return res.status(500).json({ error: 'Database query failed' });
                 }
