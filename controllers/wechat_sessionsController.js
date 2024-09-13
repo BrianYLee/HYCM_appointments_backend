@@ -22,8 +22,9 @@ exports.postWechatLogin = async (req, res) => {
         }
         await LoginService.createWeChatSession(openid, session_key);
         const employeeData = await getEmployeeByOpenId(openid);
-        if (!employeeData || !employeeData?.isActive) {
-            res.json({ success: true, openid });
+        console.log(employeeData);
+        if (!employeeData || !employeeData?.active) {
+            return res.json({ success: true, openid });
         }
         res.json({ success: true, openid, employee: true, employee_name: `${employeeData.last_name}${employeeData.first_name}`, department: employeeData.department });
     } catch (err) {
@@ -44,8 +45,8 @@ exports.postWechatRenew = async (req, res) => {
             return res.json({ success: false, message: 'logout' });
         }
         const employeeData = await getEmployeeByOpenId(openid);
-        if (!employeeData || !employeeData?.isActive) {
-            res.json({ success: true, openid });
+        if (!employeeData || !employeeData?.active) {
+            return res.json({ success: true, openid });
         }
         res.json({ success: true, openid, employee: true, employee_name: `${employeeData.last_name}${employeeData.first_name}`, department: employeeData.department });
 

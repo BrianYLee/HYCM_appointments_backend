@@ -6,7 +6,7 @@ exports.getAppointments = async (req, res) => {
         const openid = req.query?.openid;
         const dateToFetch = req.query?.date;
         const employee = await EmplService.getEmployeeByOpenId(openid);
-        if (!employee || !employee?.isActive) {
+        if (!employee || !employee?.active) {
             throw new Error('unauthorized');
         }
         const department = employee.department;
@@ -92,7 +92,7 @@ exports.postCheckIn = async (req, res) => {
             throw new Error('bad request payload');
         }
         const employee = await EmplService.getEmployeeByOpenId(body.openid);
-        if (!employee || !employee?.isActive) {
+        if (!employee || !employee?.active) {
             throw new Error('unauthorized');
         }
         const result = await ApmtService.checkInById(body.apmtid, body.area);
@@ -110,7 +110,7 @@ exports.postCheckOut = async (req, res) => {
             throw new Error('bad request payload');
         }
         const employee = await EmplService.getEmployeeByOpenId(body.openid);
-        if (!employee || !employee?.isActive) {
+        if (!employee || !employee?.active) {
             throw new Error('unauthorized');
         }
         const result = await ApmtService.checkOutById(body.apmtid, body.area);
