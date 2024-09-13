@@ -1,280 +1,122 @@
-const pool = require('../config/db');
-//const moment = require('moment-timezone');
+const ApmtService = require('../services/appointmentsService');
+const EmplService = require('../services/employeeService');
 
-const filterAppointmentsByDept = (apmts, dept) => {
-    if (!dept) {
-        return [];
-    }
-    switch (dept) {
-        case '安保':
-            return apmts.map((apmt) => {
-                apmt = { ...apmt, canCheckIn: true, canCheckOut: false };
-                const { type, hotel, golf, horse, areas, scheduled_time_string, manager_name, bridal_name, created_date, created_by, ...rest } = apmt;
-                return rest;
-            });
-        case '市场':
-            return apmts.map((apmt) => {
-                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, golf, created_date, created_by, ...rest } = apmt;
-                return rest;
-            });
-        case '酒店':
-            return apmts.map((apmt) => {
-                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { golf, horse, created_date, areas, created_by, ...rest } = apmt;
-                return rest;
-            });
-        case '球会':
-            return apmts.map((apmt) => {
-                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, horse, created_date, areas, scheduled_time_string, created_by, ...rest } = apmt;
-                return rest;
-            });
-        case '马会':
-            return apmts.filter(apmt => apmt.horse == true).map((apmt) => {
-                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, golf, areas, scheduled_time_string, created_date, created_by, ...rest } = apmt;
-                return rest;
-            });
-        case '其他':
-            return apmts.map((apmt) => {
-                apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, golf, horse, areas, scheduled_time_string, bridal_name, created_date, created_by, ...rest } = apmt;
-                return rest;
-            });
-        case 'admin':
-            return apmts.map((apmt) => {
-                return { ...apmt, canCheckIn: true, canCheckOut: true, canEdit: true };
-            });
-    }
-}
-
-// Function to fetch appointment records
-exports.getAppointments = (req, res) => {
+exports.getAppointments = async (req, res) => {
     try {
         const openid = req.query?.openid;
         const dateToFetch = req.query?.date;
-        pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[openid], (err1, result1) => {
-            if (err1) {
-                return res.status(500).json({ error: 'Database query failed' });
-            }
-            if (result1.length == 0 || !result1[0].active) {
-                return res.status(500).json({ error: 'unauthorized' });
-            }
-            const employeeDept = result1[0].department;
-            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date, DATE_FORMAT(created_date, '%Y-%m-%d') AS created_date FROM appointments WHERE DATE(scheduled_date) = '${dateToFetch}' AND deleted = FALSE`, (error2, results) => {
-                if (error2) {
-                    return res.status(500).json({ error: 'Database query failed' });
-                }
-                // not sure why but inserted records have varying timezones for scheduled_date
-                // fix results so that query are in beijing timezone
-                //results.forEach(appointment => {
-                //    appointment.scheduled_date = dateToFetch;
-                //});
-                res.json(filterAppointmentsByDept(results, employeeDept));
-            });
-        });
+        const employee = await EmplService.getEmployeeByOpenId(openid);
+        if (!employee || !employee?.isActive) {
+            throw new Error('unauthorized');
+        }
+        const department = employee.department;
+        const appointments = await ApmtService.getAppointmentsByDate(dateToFetch);
+        res.json(ApmtService.filterAppointmentsByDept(appointments, department));
     } catch (err) {
-        console.error('something bad happened', err);
+        console.error('appointmentsController: getAppointments: caught error', err);
         return res.status(500).json({ error: 'server error' });
     }
 };
 
-exports.postAppointment = (req, res) => {
-    const body = req.body;
-    if (!body || !body.openid || !body.scheduled_date || !body.type || body.hotel === undefined || body.golf === undefined || body.horse === undefined || !body.studio_name || !body.manager_name || !body.plate) {
-        return res.status(400).json({ error: 'bad request payload'});
-    }
-    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[body.openid], (err1, result1) => {
-        if (err1) {
-            return res.status(500).json({ error: 'Database query failed' });
-        }
-        if (result1.length == 0 || !result1[0]?.department == 'admin') {
-            return res.status(500).json({ error: 'unauthorized' });
-        }
-        const query = `INSERT INTO appointments (scheduled_date, scheduled_time_string, areas, type, hotel, golf, horse, studio_name, manager_name, bridal_name, plate, created_by) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, e.id FROM employees e WHERE e.wechat_open_id = ?;`;
-        pool.query(query, [body.scheduled_date, body.scheduled_time_string, body.areas, body.type, body.hotel, body.golf, body.horse, body.studio_name, body.manager_name, body.bridal_name, body.plate, body.openid], (error2, result) => {
-            if (error2) {
-                console.log('db error while posting appointment');
-                console.log(body);
-                console.log(error2);
-                return res.status(500).json({ error: 'db error inserting appointment' });
-            }
-            res.status(200).json({ message: 'appointment added'});
-        });
-    });
-};
-
-exports.getAppointment = (req, res) => {
+exports.getAppointment = async (req, res) => {
     try {
         const { openid, apmt } = req.query;
-        pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[openid], (err1, result1) => {
-            if (err1) {
-                return res.status(500).json({ error: 'Database query failed' });
-            }
-            if (result1.length == 0 || !result1[0].department == 'admin') {
-                return res.status(500).json({ error: 'unauthorized' });
-            }
-            pool.query(`SELECT *, DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date FROM appointments WHERE id = '${apmt}'`, (error2, results) => {
-                if (error2) {
-                    return res.status(500).json({ error: 'Database query failed' });
-                }
-                res.json(results[0]);
-            });
-        });
+        if (!EmplService.isAdmin(openid)) {
+            throw new Error('unauthorized');
+        }
+        const appointment = await ApmtService.getAppointmentById(apmt);
+        res.json(appointment);
     } catch (err) {
-        console.error('something bad happened', err);
+        console.error('appointmentsController: getAppointment: caught error', err);
         return res.status(500).json({ error: 'server error' });
     }
-}
-
-exports.editAppointment = (req, res) => {
-    const body = req.body;
-    if (!body || !body.openid || !body.id || !body.scheduled_date || !body.type || body.horse === undefined || !body.studio_name || !body.manager_name || !body.plate) {
-        return res.status(400).json({ error: 'bad request payload'});
-    }
-    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[body.openid], (err1, result1) => {
-        if (err1) {
-            return res.status(500).json({ error: 'Database query failed' });
-        }
-        if (result1.length == 0 || !result1[0]?.department == 'admin') {
-            return res.status(500).json({ error: 'unauthorized' });
-        }
-        const query = `UPDATE appointments SET checked_in = ?, scheduled_date = ?, scheduled_time_string = ?, areas = ?, bridal_name = ?, type = ?, horse = ?, studio_name = ?, manager_name = ?, plate = ? WHERE id = ?`;
-        pool.query(query, [body.checked_in, body.scheduled_date, body.scheduled_time_string, body.areas, body.bridal_name, body.type, body.horse, body.studio_name, body.manager_name, body.plate, body.id], (error2, result) => {
-            if (error2) {
-                console.log('db error while updating appointment');
-                console.log(body);
-                console.log(error2);
-                return res.status(500).json({ error: 'db error inserting appointment' });
-            }
-            res.status(200).json({ message: 'appointment updated'});
-        });
-    });
-}
-
-exports.deleteAppointment = (req, res) => {
-    const body = req.body;
-    if (!body || !body.openid || !body.id ) {
-        return res.status(400).json({ error: 'bad request payload'});
-    }
-    pool.query(`SELECT * FROM employees WHERE wechat_open_id = ?`,[body.openid], (err1, result1) => {
-        if (err1) {
-            return res.status(500).json({ error: 'Database query failed' });
-        }
-        if (result1.length == 0 || !result1[0]?.department == 'admin') {
-            return res.status(500).json({ error: 'unauthorized' });
-        }
-        const query = `UPDATE appointments SET deleted = TRUE WHERE id = ?`;
-        pool.query(query, [body.id], (error2, result) => {
-            if (error2) {
-                console.log('db error while deleting appointment');
-                console.log(body);
-                console.log(error2);
-                return res.status(500).json({ error: 'db error deleting appointment' });
-            }
-            res.status(200).json({ message: 'appointment updated. delete -> TRUE'});
-        });
-    });
-}
-
-exports.postCheckIn = (req, res) => {
-    const body = req.body;
-    console.log('got checkin post request');
-    console.log(body);
-    if (!body || !body.openId || !body.apmtId) {
-        return res.status(400).json({ error: 'bad request payload'});
-    }
-    
-    // queries
-    const employeeIdQuery = 'SELECT * FROM employees WHERE wechat_open_id = ?';
-    const apmtQuery = 'UPDATE appointments SET checked_in = ? WHERE id = ?';
-    const checkInQuery = 'INSERT INTO check_ins (appointment_id, employee_id) VALUES (?, ?)';
-    
-    // results
-    pool.query(employeeIdQuery, [body.openId], (err1, results1) => {
-        if (err1) {
-            console.log('db error while fetching employee ID ' + body.openId);
-            return res.status(500).json({ error: 'db error while fetching employee ID' });
-        }
-        if (results1.length == 0) {
-            console.log('no employee found with openid ' + body.openId);
-            return res.status(500).json({ error: 'no employee found with given openid' });
-        }
-        if (results1.length > 1) {
-            console.log('something is srsly fucked. why are there multiple employees for openid ' + body.openId);
-            console.log(results1);
-            return res.status(500).json({ error: 'something is srsly fucked. why are there multiple employees for the given openid '});
-        }
-        if (!results1[0].active) {
-            console.log(`${body.openId} is not authorized`);
-            console.log(results1);
-            return res.status(500).json({ error: 'unauthorized'});
-        }
-        const employeeId = results1[0].id;
-        pool.query(apmtQuery, [true, body.apmtId], (err2, results2) => {
-            if (err2) {
-                console.log('db error while updating appointment id ' + body.apmtId);
-                return res.status(500).json({ error: `db error while updating appointment id ${body.apmtId}` });
-            }
-            pool.query(checkInQuery, [body.apmtId, employeeId], (err3, results3) => {
-                if (err3) {
-                    console.log(`db error while creating checkin for apmtId ${body.apmtId}`);
-                    return res.status(500).json({ error: `db error while creating checkin for apmtId ${body.apmtId}` });
-                }
-                res.status(200).json({ message: 'appointment checked in'});
-            });
-        });
-    });
 };
 
-exports.postCheckOut = (req, res) => {
-    const body = req.body;
-    console.log('got check-out post request');
-    console.log(body);
-    if (!body || !body.openId || !body.apmtId) {
-        return res.status(400).json({ error: 'bad request payload'});
+exports.postAppointment = async (req, res) => {
+    try {
+        const body = req.body;
+        if (!body || !body.openid ) {
+            throw new Error('bad query parameters');
+        }
+        const employee = await EmplService.getEmployeeByOpenId(body.openid);
+        if (!employee || !employee?.department == 'admin') {
+            throw new Error('unauthorized');
+        }
+        const result = await ApmtService.createAppointment(employee.id, body);
+        res.json(result);
+    } catch (err) {
+        console.error('appointmentsController: postAppointment: caught error', err);
+        return res.status(500).json({ error: 'server error' });
     }
-    
-    // queries
-    const employeeIdQuery = 'SELECT * FROM employees WHERE wechat_open_id = ?';
-    const apmtQuery = 'UPDATE appointments SET checked_in = ? WHERE id = ?';
-    const checkOutQuery = 'INSERT INTO check_outs (appointment_id, employee_id) VALUES (?, ?)';
-    
-    // results
-    pool.query(employeeIdQuery, [body.openId], (err1, results1) => {
-        if (err1) {
-            console.log('db error while fetching employee ID ' + body.openId);
-            return res.status(500).json({ error: 'db error while fetching employee ID' });
-        }
-        if (results1.length == 0) {
-            console.log('no employee found with openid ' + body.openId);
-            return res.status(500).json({ error: 'no employee foun with given openid' });
-        }
-        if (results1.length > 1) {
-            console.log('something is srsly fucked. why are there multiple employees for openid ' + body.openId);
-            console.log(results1);
-            return res.status(500).json({ error: 'something is srsly fucked. why are there multiple employees for the given openid '});
+};
 
+exports.editAppointment = async (req, res) => {
+    try {
+        const body = req.body;
+        if (!body || !body.openid || !body.id) {
+            throw new Error('bad request payload');
         }
-        if (!results1[0].active) {
-            console.log(`${body.openId} is not authorized`);
-            console.log(results1);
-            return res.status(500).json({ error: 'unauthorized'});
+        if (!await EmplService.isAdmin(body.openid)) {
+            throw new Error('unauthorized');
         }
-        const employeeId = results1[0].id;
-        pool.query(apmtQuery, [false, body.apmtId], (err2, results2) => {
-            if (err2) {
-                console.log('db error while updating appointment id ' + body.apmtId);
-                return res.status(500).json({ error: `db error while updating appointment id ${body.apmtId}` });
-            }
-            pool.query(checkOutQuery, [body.apmtId, employeeId], (err3, results3) => {
-                if (err3) {
-                    console.log(`db error while creating check-out for apmtId ${body.apmtId}`);
-                    return res.status(500).json({ error: `db error while creating check-out for apmtId ${body.apmtId}` });
-                }
-                res.status(200).json({ message: 'appointment checked out'});
-            });
-        });
-    });
+        const result = await ApmtService.updateAppointmentById(body);
+        res.json(result);
+    } catch (err) {
+        console.error('appointmentsController: editAppointment: caught error', err);
+        return res.status(500).json({ error: 'server error' });
+    }
+};
+
+exports.deleteAppointment = async (req, res) => {
+    try {
+        const body = req.body;
+        if (!body || !body.openid || !body.apmtid ) {
+            throw new Error('bad request payload');
+        }
+        if (!await EmplService.isAdmin(body.openid)) {
+            throw new Error('unauthorized');
+        }
+        const result = await ApmtService.deleteAppointmentById(body.apmtid);
+        res.json(result);
+    } catch (err) {
+        console.error('appointmentsController: deleteAppointment: caught error', err);
+        return res.status(500).json({ error: 'server error' }); 
+    }
+};
+
+exports.postCheckIn = async (req, res) => {
+    // TODO: insert check-in record to appropriate table (hotel_ins etc...)
+    try {
+        const body = req.body;
+        if (!body || !body.openid || !body.apmtid || !body.area) {
+            throw new Error('bad request payload');
+        }
+        const employee = await EmplService.getEmployeeByOpenId(body.openid);
+        if (!employee || !employee?.isActive) {
+            throw new Error('unauthorized');
+        }
+        const result = await ApmtService.checkInById(body.apmtid, body.area);
+        res.json(result);
+    } catch (err) {
+        console.error('appointmentsController: postCheckIn: caught error', err);
+        return res.status(500).json({ error: 'server error' }); 
+    }
+};
+
+exports.postCheckOut = async (req, res) => {
+    try {
+        const body = req.body;
+        if (!body || !body.openid || !body.apmtid || !body.area) {
+            throw new Error('bad request payload');
+        }
+        const employee = await EmplService.getEmployeeByOpenId(body.openid);
+        if (!employee || !employee?.isActive) {
+            throw new Error('unauthorized');
+        }
+        const result = await ApmtService.checkOutById(body.apmtid, body.area);
+        res.json(result);
+    } catch (err) {
+        console.error('appointmentsController: postCheckOut: caught error', err);
+        return res.status(500).json({ error: 'server error' }); 
+    }
 };
