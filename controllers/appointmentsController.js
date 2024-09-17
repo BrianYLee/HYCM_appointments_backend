@@ -1,5 +1,6 @@
 const ApmtService = require('../services/appointmentsService');
 const EmplService = require('../services/employeeService');
+const VehicleService = require('../services/vehiclesService');
 
 exports.getAppointments = async (req, res) => {
     try {
@@ -11,7 +12,12 @@ exports.getAppointments = async (req, res) => {
         }
         const department = employee.department;
         const appointments = await ApmtService.getAppointmentsByDate(dateToFetch);
-        res.json(ApmtService.filterAppointmentsByDept(appointments, department));
+        const apmtWithVehiclePromises = appointments.map( async (apmt) => {
+            const vehicles = await VehicleService.getVehiclesByApmtId(apmt.id);
+            return { ...apmt, vehicles };
+        });
+        const apmtWithVehicles = await Promise.all(apmtWithVehiclePromises);
+        res.json(ApmtService.filterAppointmentsByDept(apmtWithVehicles, department));
     } catch (err) {
         console.error('appointmentsController: getAppointments: caught error', err);
         return res.status(500).json({ error: 'server error' });
@@ -25,7 +31,8 @@ exports.getAppointment = async (req, res) => {
             throw new Error('unauthorized');
         }
         const appointment = await ApmtService.getAppointmentById(apmt);
-        res.json(appointment);
+        const vehicles = await VehicleService.getVehiclesByApmtId(apmt);
+        res.json({ ...appointment, vehicles});
     } catch (err) {
         console.error('appointmentsController: getAppointment: caught error', err);
         return res.status(500).json({ error: 'server error' });
@@ -35,15 +42,17 @@ exports.getAppointment = async (req, res) => {
 exports.postAppointment = async (req, res) => {
     try {
         const body = req.body;
-        if (!body || !body.openid ) {
-            throw new Error('bad query parameters');
+        if (!body || !body.openid || !body.plates) {
+            throw new Error('bad request payload');
         }
         const employee = await EmplService.getEmployeeByOpenId(body.openid);
         if (!employee || !employee?.department == 'admin') {
             throw new Error('unauthorized');
         }
-        const result = await ApmtService.createAppointment(employee.id, body);
-        res.json(result);
+        const apmtRes = await ApmtService.createAppointment(employee.id, body);
+        const apmtId = apmtRes.insertId;
+        const vehiclesRes = await VehicleService.insertVehicles(apmtId, body.plates);
+        res.json(vehiclesRes);
     } catch (err) {
         console.error('appointmentsController: postAppointment: caught error', err);
         return res.status(500).json({ error: 'server error' });
