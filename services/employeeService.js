@@ -36,7 +36,7 @@ const isEmployee = (wechat_open_id) => {
 
 const isAdmin = (wechat_open_id) => {
     return new Promise((res, rej) => {
-        const query = 'SELECT * FROM employees WHERE wechat_open_id = ? AND department = TRUE';
+        const query = 'SELECT * FROM employees WHERE wechat_open_id = ? AND department = "admin"';
         pool.query(query, [wechat_open_id], (error, results) => {
             if (error) return rej(error);
             if (results.length === 0) return res(false);
