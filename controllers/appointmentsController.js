@@ -42,7 +42,7 @@ exports.getAppointment = async (req, res) => {
 exports.postAppointment = async (req, res) => {
     try {
         const body = req.body;
-        if (!body || !body.openid || !body.plates) {
+        if (!body || !body.openid || !body.vehicles) {
             throw new Error('bad request payload');
         }
         const employee = await EmplService.getEmployeeByOpenId(body.openid);
@@ -51,7 +51,7 @@ exports.postAppointment = async (req, res) => {
         }
         const apmtRes = await ApmtService.createAppointment(employee.id, body);
         const apmtId = apmtRes.insertId;
-        const vehiclesRes = await VehicleService.insertVehicles(apmtId, body.plates);
+        const vehiclesRes = await VehicleService.insertVehicles(apmtId, body.vehicles);
         res.json(vehiclesRes);
     } catch (err) {
         console.error('appointmentsController: postAppointment: caught error', err);
@@ -68,8 +68,15 @@ exports.editAppointment = async (req, res) => {
         if (!await EmplService.isAdmin(body.openid)) {
             throw new Error('unauthorized');
         }
-        const result = await ApmtService.updateAppointmentById(body);
-        res.json(result);
+        const apmtRes = await ApmtService.updateAppointmentById(body);
+        console.log(apmtRes);
+        const vehiclePromises = body.vehicles.map((vehicle) => {
+            if (vehicle.isDeleted === true) return VehicleService.deleteVehicleById(vehicle);
+            else if (vehicle.isNew === true) return VehicleService.insertVehicle(body.id, vehicle.plate);
+            else if (vehicle.isEdited === true) return VehicleService.updateVehicle(vehicle);
+        });
+        const vehiclesRes = await Promise.all(vehiclePromises);
+        res.json({ ...apmtRes, ...vehiclesRes});
     } catch (err) {
         console.error('appointmentsController: editAppointment: caught error', err);
         return res.status(500).json({ error: 'server error' });

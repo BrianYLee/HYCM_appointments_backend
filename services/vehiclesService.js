@@ -10,11 +10,21 @@ const getVehiclesByApmtId = (a_id) => {
     });
 };
 
-const insertVehicles = (a_id, plates) => {
+const insertVehicle = (a_id, plate) => {
+    return new Promise((res, rej) => {
+        const query = `INSERT INTO vehicles (appointment_id, plate) VALUES (?, ?)`;
+        pool.query(query, [a_id, plate], (error, results) => {
+            if (error) return rej(error);
+            res(results);
+        });
+    });
+};
+
+const insertVehicles = (a_id, vehicles) => {
     return new Promise((res, rej) => {
         let query = `INSERT INTO vehicles (appointment_id, plate) VALUES `;
-        const values = plates.map(plate => {
-            return `(${pool.escape(a_id)}, ${pool.escape(plate)})`;
+        const values = vehicles.map(v => {
+            return `(${pool.escape(a_id)}, ${pool.escape(v.plate)})`;
         }).join(', ');
         query += values;
         pool.query(query, (error, results) => {
@@ -23,6 +33,26 @@ const insertVehicles = (a_id, plates) => {
         });
     });
 };
+
+const updateVehicle = (vehicle) => {
+    return new Promise((res, rej) => {
+        const query = `UPDATE vehicles SET plate = ?, checked_in = ? WHERE id = ?`;
+        pool.query(query, [vehicle.plate, vehicle.checked_in, vehicle.id], (error, results) => {
+            if (error) return rej(error);
+            res(results);
+        });
+    });
+}
+
+const deleteVehicleById = (vehicle) => {
+    return new Promise((res, rej) => {
+        const query = `DELETE FROM vehicles WHERE id = ?`;
+        pool.query(query, [vehicle.id], (error, results) => {
+            if (error) return rej(error);
+            res(results);
+        });
+    });
+}
 
 const checkInById = (id) => {
     return new Promise((res, rej) => {
@@ -52,7 +82,10 @@ const checkOutById = (id) => {
 
 module.exports = {
     getVehiclesByApmtId,
+    insertVehicle,
     insertVehicles,
+    updateVehicle,
+    deleteVehicleById,
     checkInById,
     checkOutById
 };
