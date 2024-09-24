@@ -20,5 +20,5 @@ app.use('/register', registerRoute);
 
 // Start the server
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`hycm_apmts_app Server running on port ${port}`);
 });

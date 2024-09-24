@@ -22,7 +22,6 @@ exports.postWechatLogin = async (req, res) => {
         }
         await LoginService.createWeChatSession(openid, session_key);
         const employeeData = await getEmployeeByOpenId(openid);
-        console.log(employeeData);
         if (!employeeData || !employeeData?.active) {
             return res.json({ success: true, openid });
         }

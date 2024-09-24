@@ -69,7 +69,6 @@ exports.editAppointment = async (req, res) => {
             throw new Error('unauthorized');
         }
         const apmtRes = await ApmtService.updateAppointmentById(body);
-        console.log(apmtRes);
         const vehiclePromises = body.vehicles.map((vehicle) => {
             if (vehicle.isDeleted === true) return VehicleService.deleteVehicleById(vehicle);
             else if (vehicle.isNew === true) return VehicleService.insertVehicle(body.id, vehicle.plate);
