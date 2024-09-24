@@ -8,31 +8,31 @@ const filterAppointmentsByDept = (apmts, dept) => {
         case '安保':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: true, canCheckOut: false };
-                const { type, hotel, golf, horse, areas, scheduled_time_string, manager_name, bridal_name, created_date, created_by, ...rest } = apmt;
+                const { type, has_jockey, hotel_checked_in, golf_checked_in, jockey_checked_in, areas, scheduled_time_string, bridal_name, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '市场':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, golf, created_date, created_by, ...rest } = apmt;
+                const { created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '酒店':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { golf, horse, created_date, areas, created_by, ...rest } = apmt;
+                const { golf_checked_in, jockey_checked_in, created_date, areas, created_by, ...rest } = apmt;
                 return rest;
             });
         case '球会':
             return apmts.map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, horse, created_date, areas, scheduled_time_string, created_by, ...rest } = apmt;
+                const { hotel_checked_in, horse_checked_in, created_date, areas, scheduled_time_string, created_by, ...rest } = apmt;
                 return rest;
             });
         case '马会':
-            return apmts.filter(apmt => apmt.horse == true).map((apmt) => {
+            return apmts.filter(apmt => apmt.has_jockey == true).map((apmt) => {
                 apmt = { ...apmt, canCheckIn: false, canCheckOut: false };
-                const { hotel, golf, areas, scheduled_time_string, created_date, created_by, ...rest } = apmt;
+                const { hotel_checked_in, golf_checked_in, areas, scheduled_time_string, created_date, created_by, ...rest } = apmt;
                 return rest;
             });
         case '其他':
