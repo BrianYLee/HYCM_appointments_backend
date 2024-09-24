@@ -104,14 +104,27 @@ exports.postCheckIn = async (req, res) => {
     // TODO: insert check-in record to appropriate table (hotel_ins etc...)
     try {
         const body = req.body;
-        if (!body || !body.openid || !body.apmtid || !body.area) {
+        const { openid, id, area } = body; 
+        if (!openid || !id || !area){
             throw new Error('bad request payload');
         }
-        const employee = await EmplService.getEmployeeByOpenId(body.openid);
+        const employee = await EmplService.getEmployeeByOpenId(openid);
         if (!employee || !employee?.active) {
             throw new Error('unauthorized');
         }
-        const result = await ApmtService.checkInById(body.apmtid, body.area);
+        let result;
+        switch (area) {
+            case 'security':
+                result = await VehicleService.checkInById(id);
+                break;
+            case 'jockey':
+            case 'golf':
+            case 'hotel':
+                result = await ApmtService.checkInById(id, area);
+                break;
+            default:
+                throw new Error('unknown area for check in');
+        }
         res.json(result);
     } catch (err) {
         console.error('appointmentsController: postCheckIn: caught error', err);
@@ -122,17 +135,67 @@ exports.postCheckIn = async (req, res) => {
 exports.postCheckOut = async (req, res) => {
     try {
         const body = req.body;
-        if (!body || !body.openid || !body.apmtid || !body.area) {
+        const { openid, id, area } = body; 
+        if (!openid || !id || !area){
+            throw new Error('bad request payload');
+        }
+        const employee = await EmplService.getEmployeeByOpenId(openid);
+        if (!employee || !employee?.active) {
+            throw new Error('unauthorized');
+        }
+        let result;
+        switch (area) {
+            case 'security':
+                result = await VehicleService.checkOutById(id);
+                break;
+            case 'jockey':
+            case 'golf':
+            case 'hotel':
+                result = await ApmtService.checkOutById(id, area);
+                break;
+            default:
+                throw new Error('unknown area for check out');
+        }
+        res.json(result);
+    } catch (err) {
+        console.error('appointmentsController: postCheckOut: caught error', err);
+        return res.status(500).json({ error: 'server error' }); 
+    }
+};
+
+exports.postVehicleCheckIn = async (req, res) => {
+    // TODO: insert check-in record to appropriate table (hotel_ins etc...)
+    try {
+        const body = req.body;
+        if (!body || !body.openid || !body.v_id) {
             throw new Error('bad request payload');
         }
         const employee = await EmplService.getEmployeeByOpenId(body.openid);
         if (!employee || !employee?.active) {
             throw new Error('unauthorized');
         }
-        const result = await ApmtService.checkOutById(body.apmtid, body.area);
+        const result = await VehicleService.checkInById(body.v_id);
         res.json(result);
     } catch (err) {
-        console.error('appointmentsController: postCheckOut: caught error', err);
+        console.error('appointmentsController: postVehicleCheckIn: caught error', err);
+        return res.status(500).json({ error: 'server error' }); 
+    }
+};
+
+exports.postVehicleCheckOut = async (req, res) => {
+    try {
+        const body = req.body;
+        if (!body || !body.openid || !body.v_id) {
+            throw new Error('bad request payload');
+        }
+        const employee = await EmplService.getEmployeeByOpenId(body.openid);
+        if (!employee || !employee?.active) {
+            throw new Error('unauthorized');
+        }
+        const result = await VehicleService.checkOutById(body.v_id);
+        res.json(result);
+    } catch (err) {
+        console.error('appointmentsController: postVehicleCheckOut: caught error', err);
         return res.status(500).json({ error: 'server error' }); 
     }
 };
